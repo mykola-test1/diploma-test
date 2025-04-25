@@ -7,7 +7,7 @@ app = Flask(__name__)
 def get_db_connection():
     try:
         connection = mysql.connector.connect(
-            host="mysql_db",  # Ensure the MySQL service is correctly configured.
+            host="mysql_db",  # Ensure the MySQL service is correctly configured (e.g., Docker).
             user="root",
             password="password",  # Ensure the password is correct.
             database="test_db"    # Ensure the database exists or is created.
@@ -16,6 +16,10 @@ def get_db_connection():
     except Error as e:
         print(f"Error: {e}")
         return None
+
+@app.route('/ping', methods=['GET'])
+def ping():
+    return jsonify({"status": "ok"}), 200
 
 @app.route('/create_table', methods=['POST'])
 def create_table():
@@ -45,7 +49,7 @@ def insert_data():
     if not connection:
         return jsonify({"error": "Failed to connect to the database"}), 500
     cursor = connection.cursor()
-    data = request.get_json()  # Get JSON data from the request
+    data = request.get_json()
 
     if not data or 'name' not in data or 'email' not in data:
         return jsonify({"error": "Missing 'name' or 'email' field"}), 400
@@ -70,11 +74,27 @@ def get_users():
     connection = get_db_connection()
     if not connection:
         return jsonify({"error": "Failed to connect to the database"}), 500
-    cursor = connection.cursor()
+    cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute("SELECT * FROM users")
         users = cursor.fetchall()
-        return jsonify(users), 201
+        return jsonify(users), 200
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/clear_users', methods=['POST'])
+def clear_users():
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({"error": "Failed to connect to the database"}), 500
+    cursor = connection.cursor()
+    try:
+        cursor.execute("DELETE FROM users")
+        connection.commit()
+        return jsonify({"message": "All users deleted"}), 200
     except Error as e:
         return jsonify({"error": str(e)}), 500
     finally:
